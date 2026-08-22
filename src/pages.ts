@@ -63,6 +63,10 @@ export function llmsTxt(origin: string): string {
   lines.push("");
   lines.push("Machine-readable OpenAPI spec: " + `${origin}/openapi.json`);
   lines.push("");
+  lines.push(
+    `MCP server (Model Context Protocol, Streamable HTTP): ${origin}/mcp — exposes all endpoints as tools for AI agents. Manifest at ${origin}/mcp.txt.`
+  );
+  lines.push("");
   lines.push("## Endpoints");
   lines.push("");
   for (const ep of ENDPOINTS) {
@@ -299,6 +303,7 @@ export function landingPage(origin: string): string {
 <span class="badge">CORS: *</span>
 <span class="badge"><a href="${origin}/llms.txt" style="color:inherit;text-decoration:none">llms.txt</a></span>
 <span class="badge"><a href="${origin}/openapi.json" style="color:inherit;text-decoration:none">OpenAPI 3.1</a></span>
+<span class="badge"><a href="${origin}/mcp.txt" style="color:inherit;text-decoration:none">MCP server</a></span>
 </p>
 <h2>Endpoints</h2>
 ${cards}

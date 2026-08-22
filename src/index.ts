@@ -9,6 +9,7 @@ import {
   robotsTxt,
   faviconSvg,
 } from "./pages";
+import { handleMcp, mcpManifest } from "./mcp";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,11 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
+    // MCP endpoint accepts POST (JSON-RPC) — handle before the GET-only gate
+    if (path === "/mcp") {
+      return handleMcp(req);
+    }
+
     if (req.method !== "GET" && req.method !== "HEAD") {
       return jsonRes({ ok: false, error: "only GET requests are supported", docs: `${origin}/` }, 405);
     }
@@ -92,6 +98,8 @@ export default {
         return jsonRes(openApiSpec(origin));
       case "/robots.txt":
         return textRes(robotsTxt(), "text/plain");
+      case "/mcp.txt":
+        return textRes(mcpManifest(origin), "text/plain");
       case "/favicon.svg":
         return new Response(faviconSvg(), { headers: { "content-type": "image/svg+xml", ...CORS_HEADERS } });
     }

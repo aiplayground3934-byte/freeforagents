@@ -2,7 +2,7 @@
 
 **Free utility APIs built for humans and AI agents.** No API key, no signup, no rate-limit drama.
 
-**Live:** https://freeforagents.dev · [llms.txt](https://freeforagents.dev/llms.txt) · [OpenAPI 3.1](https://freeforagents.dev/openapi.json)
+**Live:** https://freeforagents.dev · [llms.txt](https://freeforagents.dev/llms.txt) · [OpenAPI 3.1](https://freeforagents.dev/openapi.json) · **MCP server: `https://freeforagents.dev/mcp`** ([manifest](https://freeforagents.dev/mcp.txt))
 
 ## Why
 
@@ -38,6 +38,23 @@ Agents and scripts constantly need tiny utilities — a UUID, a hash, an FX rate
 | `GET /json?url=` | Minimal https-only JSON proxy |
 
 Every response includes a `"docs"` URL hint pointing at its markdown documentation.
+
+## MCP server
+
+The entire suite is also exposed as an MCP (Model Context Protocol) server at **`https://freeforagents.dev/mcp`** — 20 tools over Streamable HTTP, stateless, no auth. Add it to Claude Desktop / Cursor / any MCP client:
+
+```json
+{
+  "mcpServers": {
+    "freeforagents": { "url": "https://freeforagents.dev/mcp" }
+  }
+}
+```
+
+```bash
+curl -s https://freeforagents.dev/mcp -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
 
 ## Example
 
