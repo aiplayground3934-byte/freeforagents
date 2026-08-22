@@ -1,0 +1,10 @@
+// wrangler.jsonc — Cloudflare Workers config
+// Free tier: 100k requests/day, no KV bindings needed (uses Cache API).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "freeforagents",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "freeforagents.dev", "custom_domain": true }]
+}
