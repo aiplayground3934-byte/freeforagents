@@ -6,5 +6,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-01-01",
   "workers_dev": false,
-  "routes": [{ "pattern": "freeforagents.dev", "custom_domain": true }]
+  "routes": [{ "pattern": "freeforagents.dev", "custom_domain": true }],
+  "analytics_engine_datasets": [
+    { "binding": "STATS", "dataset": "freeforagents_stats" }
+  ]
 }

@@ -54,8 +54,19 @@ function docsIndexMd(origin: string): string {
   ].join("\n");
 }
 
+interface Env {
+  STATS: AnalyticsEngineDataset;
+}
+
+const BOT_PATTERNS = /bot|crawl|spider|slurp|GPT|Claude|anthropic|Perplexity|Bytespider|CCBot|Applebot|cohere|meta-externalagent|Amazonbot/i;
+
+function classifyAgent(ua: string): string {
+  if (!ua) return "empty";
+  return BOT_PATTERNS.test(ua) ? "bot" : "human";
+}
+
 export default {
-  async fetch(req: Request): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const origin = url.origin;
     let path = url.pathname.length > 1 && url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
@@ -63,6 +74,44 @@ export default {
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
+
+    const res = await handle(req, env, url, origin, path);
+    ctx.waitUntil(Promise.resolve(trackSync(env, req, res)));
+    return res;
+  },
+};
+
+function trackSync(env: Env, req: Request, res: Response): void {
+  const url = new URL(req.url);
+  let path = url.pathname.length > 1 && url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
+  let label = path;
+  const ep = findEndpoint(path);
+  if (ep) label = ep.name;
+  else if (path.startsWith("/docs/")) label = "/docs";
+  else if (["/", "/llms.txt", "/openapi.json", "/robots.txt", "/mcp", "/mcp.txt"].includes(path)) label = path;
+  else label = "404";
+  try {
+    env.STATS.writeDataPoint({
+      indexes: [label.slice(0, 96)],
+      blobs: [
+        classifyAgent(req.headers.get("user-agent") ?? ""),
+        String(res.status),
+        (req.headers.get("referer") ?? "").slice(0, 200),
+      ],
+      doubles: [],
+    });
+  } catch {
+    // analytics must never break a request
+  }
+}
+
+async function handle(
+  req: Request,
+  _env: Env,
+  url: URL,
+  origin: string,
+  path: string
+): Promise<Response> {
 
     // MCP endpoint accepts POST (JSON-RPC) — handle before the GET-only gate
     if (path === "/mcp") {
@@ -130,5 +179,4 @@ export default {
       return jsonRes({ ok: false, error: `no such endpoint: ${url.pathname}`, docs: `${origin}/` }, 404);
     }
     return htmlRes(notFoundPage(origin, url.pathname), 404);
-  },
-};
+}

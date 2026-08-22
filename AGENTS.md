@@ -47,8 +47,27 @@ npm run deploy     # requires wrangler auth
 
 - Deployed via `npx wrangler deploy`; custom domain `freeforagents.dev` configured in `wrangler.jsonc` (`workers_dev: false`).
 - Wrangler OAuth token lives OUTSIDE the repo at `~/Library/Preferences/.wrangler/config/default.toml` (account email: aiplayground3934@gmail.com). Never commit tokens.
+- **Analytics Engine binding (`STATS`)** requires an API token with `Workers Scripts Edit` + `Account Analytics Read` + `Zone Workers Routes Edit`; wrangler's OAuth has no AE scope. Deploy with `CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=da4b0c29ca4b88c444140be516510dbe npx wrangler deploy`.
 - Git pushes use `gh auth setup-git` credential helper; GitHub account: aiplayground3934-byte.
 - Commits use GitHub noreply email for privacy.
+
+## Analytics / traffic checking
+
+Every request writes an Analytics Engine datapoint to dataset `freeforagents_stats`:
+- `index1` = route label (endpoint name, `/mcp`, `/docs`, `/`, or `404`)
+- `blob1` = `bot` | `human` | `empty` (user-agent classified via BOT_PATTERNS)
+- `blob2` = HTTP status
+- `blob3` = referer
+
+Query it with `scripts/stats.sh` (needs `CF_ACCOUNT_ID` + `CF_API_TOKEN` env vars):
+```bash
+./scripts/stats.sh        # requests by endpoint, 24h
+./scripts/stats.sh bots   # bot vs human split
+./scripts/stats.sh week   # by endpoint, 7 days
+./scripts/stats.sh errors # non-200s
+./scripts/stats.sh "SELECT ..."  # custom SQL (columns: index1, blob1..3, timestamp)
+```
+AE SQL endpoint: POST https://api.cloudflare.com/client/v4/accounts/<account_id>/analytics_engine/sql. Retention ~90 days. Data lags a few minutes behind realtime.
 
 ## Traffic strategy (why the project exists)
 
