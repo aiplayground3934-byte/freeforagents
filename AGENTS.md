@@ -40,8 +40,16 @@ Agent-discovery surfaces: `/llms.txt`, `/openapi.json`, `/docs/<name>.md` (raw m
 ```bash
 npm run dev        # wrangler dev on :8787
 npm run typecheck  # tsc --noEmit
-npm run deploy     # requires wrangler auth
+npm run deploy     # requires wrangler auth — BUT see credentials note re: Analytics Engine
+./scripts/deploy.sh  # full local deploy: typecheck + deploy + smoke tests
+                     # needs CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID env vars
 ```
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/deploy.yml`) auto-deploys on every push to `main`:
+typecheck → wrangler deploy → production smoke tests. Uses repo secrets
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`. Check status with `gh run list`.
 
 ## Deployment & credentials
 
