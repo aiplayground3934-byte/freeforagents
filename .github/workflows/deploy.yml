@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke tests
+        run: |
+          sleep 10
+          fail=0
+          for path in "/" "/llms.txt" "/openapi.json" "/uuid" "/joke" "/docs/ip.md"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://freeforagents.dev$path")
+            if [ "$code" = "200" ]; then echo "  ✓ $path"; else echo "  ✘ $path ($code)"; fail=1; fi
+          done
+          mcp=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 -X POST "https://freeforagents.dev/mcp" \
+            -H 'Content-Type: application/json' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+          if [ "$mcp" = "200" ]; then echo "  ✓ POST /mcp"; else echo "  ✘ POST /mcp ($mcp)"; fail=1; fi
+          exit $fail
