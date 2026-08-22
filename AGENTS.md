@@ -53,7 +53,7 @@ typecheck → wrangler deploy → production smoke tests. Uses repo secrets
 
 ## Deployment & credentials
 
-- Deployed via `npx wrangler deploy`; custom domain `freeforagents.dev` configured in `wrangler.jsonc` (`workers_dev: false`).
+- Deployed via `npx wrangler deploy`; custom domains `freeforagents.dev` (canonical) and `www.freeforagents.dev` (301 → apex) configured in `wrangler.jsonc` (`workers_dev: false`).
 - Wrangler OAuth token lives OUTSIDE the repo at `~/Library/Preferences/.wrangler/config/default.toml` (account email: aiplayground3934@gmail.com). Never commit tokens.
 - **Analytics Engine binding (`STATS`)** requires an API token with `Workers Scripts Edit` + `Account Analytics Read` + `Zone Workers Routes Edit`; wrangler's OAuth has no AE scope. Deploy with `CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=da4b0c29ca4b88c444140be516510dbe npx wrangler deploy`.
 - Git pushes use `gh auth setup-git` credential helper; GitHub account: aiplayground3934-byte.
