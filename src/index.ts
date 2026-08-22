@@ -71,6 +71,13 @@ export default {
     const origin = url.origin;
     let path = url.pathname.length > 1 && url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
 
+    // Canonical host: 301 www -> apex
+    if (url.hostname === "www.freeforagents.dev") {
+      const target = new URL(req.url);
+      target.hostname = "freeforagents.dev";
+      return Response.redirect(target.toString(), 301);
+    }
+
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
