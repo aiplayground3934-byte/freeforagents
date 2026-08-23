@@ -1,4 +1,4 @@
-import { ENDPOINTS, ApiError, findEndpoint } from "./endpoints";
+import { ENDPOINTS, ApiError, findEndpoint, DNS_TYPES } from "./endpoints";
 
 // Minimal stateless MCP (Model Context Protocol) server over Streamable HTTP.
 // Exposes every FreeForAgents endpoint as an MCP tool at POST /mcp.
@@ -71,6 +71,46 @@ export const TOOLS: ToolDef[] = [
   { name: "fx_rates", title: "FX Rates", description: "Latest foreign exchange rates against a base currency, e.g. USD, EUR, JPY.", endpoint: "/fx", inputSchema: { type: "object", properties: { base: { type: "string", description: "3-letter currency code (default USD)" } } } },
   { name: "request_headers", title: "Request Headers Echo", description: "Echo back all HTTP headers of this MCP request as seen by the server.", endpoint: "/headers", inputSchema: { type: "object", properties: {} } },
   { name: "fetch_json", title: "Fetch JSON", description: "Fetch an https:// URL and return its parsed JSON body. https only, private hosts blocked, 8s timeout, 500KB limit.", endpoint: "/json", inputSchema: { type: "object", properties: { url: { type: "string", description: "The https:// URL to fetch" } }, required: ["url"] } },
+  {
+    name: "generate_qr_code", title: "QR Code Generator", description: "Generate a scannable QR code for any text or URL, returned as SVG markup in the 'svg' field. Configure error correction (L/M/Q/H) and colors.",
+    endpoint: "/qr",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "Text or URL to encode" },
+        ec: { type: "string", enum: ["L", "M", "Q", "H"], description: "Error correction level (default M)" },
+        scale: int("Module pixel size (1-64)", 1, 64),
+        margin: int("Quiet zone in modules (0-16)", 0, 16),
+        dark: { type: "string", description: "Foreground hex color e.g. 000000" },
+        light: { type: "string", description: "Background hex color e.g. ffffff" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "generate_avatar", title: "Avatar Generator", description: "Generate a deterministic SVG avatar from a seed string — same seed always yields the same image. Styles: 'identicon' (geometric pattern) or 'initials' (letters on color).",
+    endpoint: "/avatar",
+    inputSchema: {
+      type: "object",
+      properties: {
+        seed: { type: "string", description: "Seed string identifying the avatar" },
+        style: { type: "string", enum: ["identicon", "initials"], description: "Default identicon" },
+        size: int("Image size in px (16-512)", 16, 512),
+      },
+    },
+  },
+  {
+    name: "dns_lookup", title: "DNS Lookup", description: "Resolve DNS records via Cloudflare DNS-over-HTTPS. Types: A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA.",
+    endpoint: "/dns",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Domain name, e.g. example.com" },
+        type: { type: "string", enum: Object.keys(DNS_TYPES), description: "Record type (default A)" },
+      },
+      required: ["name"],
+    },
+  },
 ];
 
 function jsonRpc(id: unknown, result: unknown): unknown {

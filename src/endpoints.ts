@@ -1,4 +1,5 @@
 import { JOKES, FACTS, QUOTES, EMOJI, LOREM_WORDS } from "./data";
+import { qrSvg } from "./qr";
 
 export class ApiError extends Error {
   status: number;
@@ -777,7 +778,191 @@ export const ENDPOINTS: EndpointDef[] = [
     exampleResponse: { ok: true, source_url: "https://api.github.com/zen", content_type: "application/json; charset=utf-8", data: {} },
     run: proxyJson,
   },
+  {
+    name: "qr",
+    path: "/qr",
+    summary: "Generate a QR code for any text or URL.",
+    description:
+      "Encodes text into a scannable QR code (ISO/IEC 18004, byte mode, versions 1-40) and returns it as SVG markup. By default the SVG is embedded in the JSON response under 'svg'; pass format=svg to receive image/svg+xml directly (handy for <img> tags). Error correction, colors, size and quiet zone are configurable.",
+    params: [
+      { name: "text", type: "string", required: true, description: "The text or URL to encode (max 2953 bytes)." },
+      { name: "ec", type: "string", required: false, description: "Error correction level: L (7%), M (15%, default), Q (25%), H (30%)." },
+      { name: "scale", type: "integer", required: false, description: "Pixel size of each module, 1-64 (default 8)." },
+      { name: "margin", type: "integer", required: false, description: "Quiet-zone border in modules, 0-16 (default 4)." },
+      { name: "dark", type: "string", required: false, description: "Foreground hex color, e.g. 000000." },
+      { name: "light", type: "string", required: false, description: "Background hex color, e.g. ffffff." },
+      { name: "format", type: "string", required: false, description: "'json' (default) or 'svg' to get raw image/svg+xml." },
+    ],
+    example: "/qr?text=https%3A%2F%2Ffreeforagents.dev&ec=M",
+    exampleResponse: { ok: true, text: "https://freeforagents.dev", ec: "M", version: 3, modules: 29, byte_length: 24, svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" …></svg>" },
+    run: async ({ url }) => {
+      const text = strParam(url, "text", true);
+      if (text.length > 4000) throw new ApiError("'text' too long (max ~4000 chars)");
+      const ecRaw = strParam(url, "ec", false, "M").toUpperCase();
+      if (!(["L", "M", "Q", "H"] as const).includes(ecRaw as "L" | "M" | "Q" | "H")) {
+        throw new ApiError("'ec' must be one of: L, M, Q, H");
+      }
+      const scale = intParam(url, "scale", 8, 1, 64);
+      const margin = intParam(url, "margin", 4, 0, 16);
+      const dark = hexColor(url, "dark", "#000000");
+      const light = hexColor(url, "light", "#ffffff");
+      const format = strParam(url, "format", false, "json").toLowerCase();
+      const result = qrSvg(text, { ec: ecRaw as "L" | "M" | "Q" | "H", scale, margin, dark, light });
+      if (format === "svg") {
+        return new Response(result.svg, {
+          headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=3600" },
+        });
+      }
+      return { text, ...result };
+    },
+  },
+  {
+    name: "avatar",
+    path: "/avatar",
+    summary: "Deterministic generated avatar images.",
+    description:
+      "Generates a unique avatar from any seed string — same seed always produces the same image. Two styles: 'identicon' (symmetric geometric pattern) and 'initials' (letters on a color derived from the seed). Returns SVG markup in JSON, or directly with format=svg. Perfect for user avatars without storing images.",
+    params: [
+      { name: "seed", type: "string", required: false, description: "Any string that identifies the avatar (default: random)." },
+      { name: "style", type: "string", required: false, description: "'identicon' (default) or 'initials'." },
+      { name: "size", type: "integer", required: false, description: "Image width/height in px, 16-512 (default 120)." },
+      { name: "format", type: "string", required: false, description: "'json' (default) or 'svg' to get raw image/svg+xml." },
+    ],
+    example: "/avatar?seed=ada.lovelace@math.org&style=identicon",
+    exampleResponse: { ok: true, seed: "ada.lovelace@math.org", style: "identicon", size: 120, palette: ["hsl(210 55% 92%)", "hsl(210 62% 38%)"], svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" …></svg>" },
+    run: async ({ url }) => {
+      let seed = url.searchParams.get("seed");
+      if (!seed) seed = crypto.randomUUID();
+      if (seed.length > 200) throw new ApiError("'seed' too long (max 200 chars)");
+      const style = strParam(url, "style", false, "identicon").toLowerCase();
+      if (!["identicon", "initials"].includes(style)) throw new ApiError("'style' must be 'identicon' or 'initials'");
+      const size = intParam(url, "size", 120, 16, 512);
+      const format = strParam(url, "format", false, "json").toLowerCase();
+      const { svg } = avatarSvg(seed, style, size);
+      if (format === "svg") {
+        return new Response(svg, {
+          headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=86400" },
+        });
+      }
+      return { seed, style, size, svg };
+    },
+  },
+  {
+    name: "dns",
+    path: "/dns",
+    summary: "DNS record lookup via Cloudflare DoH.",
+    description:
+      "Resolves DNS records for any domain using Cloudflare's DNS-over-HTTPS resolver (1.1.1.1). Supports A, AAAA, CNAME, MX, TXT, NS, SOA, SRV and CAA record types. Results are edge-cached for 60 seconds.",
+    params: [
+      { name: "name", type: "string", required: true, description: "Domain name to look up, e.g. example.com." },
+      { name: "type", type: "string", required: false, description: "Record type (default A): A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA." },
+    ],
+    example: "/dns?name=cloudflare.com&type=A",
+    exampleResponse: { ok: true, name: "cloudflare.com", type: "A", nxdomain: false, records: [{ type: "A", name: "cloudflare.com", ttl: 300, data: "104.16.132.229" }] },
+    run: async ({ url }) => {
+      const name = strParam(url, "name", true).replace(/\.$/, "").toLowerCase();
+      if (!validHostname(name)) throw new ApiError("'name' must be a valid hostname like example.com");
+      const typeRaw = strParam(url, "type", false, "A").toUpperCase();
+      if (!(typeRaw in DNS_TYPES)) throw new ApiError(`'type' must be one of: ${Object.keys(DNS_TYPES).join(", ")}`);
+
+      const upstream = new URL("https://cloudflare-dns.com/dns-query");
+      upstream.searchParams.set("name", name);
+      upstream.searchParams.set("type", String(DNS_TYPES[typeRaw]));
+
+      const accept = { accept: "application/dns-json" };
+      const cacheKey = new Request(upstream.toString(), { headers: accept });
+      const cache = (caches as unknown as { default: Cache }).default;
+      let cached = await cache.match(cacheKey);
+      if (!cached) {
+        const res = await fetch(upstream.toString(), {
+          headers: accept,
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) throw new ApiError("dns resolver unavailable", 502);
+        const payload = (await res.json()) as Record<string, unknown>;
+        await cache.put(
+          cacheKey,
+          new Response(JSON.stringify(payload), {
+            headers: { "content-type": "application/json", "cache-control": "public, max-age=60" },
+          })
+        );
+        cached = await cache.match(cacheKey);
+      }
+      const payload = (await (cached as Response).json()) as Record<string, unknown>;
+
+      const status = Number(payload.Status ?? 0);
+      const answers = (payload.Answer as DnsAnswer[] | undefined) ?? [];
+      const records = answers.map((a) => ({
+        type: DNS_TYPE_NAMES[a.type] ?? String(a.type),
+        name: a.name,
+        ttl: a.TTL,
+        data: a.data,
+      }));
+      return {
+        name,
+        type: typeRaw,
+        nxdomain: status === 3,
+        records,
+      };
+    },
+  },
 ];
+
+// ---------- QR / avatar / DNS ----------
+
+function hexColor(url: URL, name: string, def: string): string {
+  const raw = url.searchParams.get(name);
+  if (raw === null || raw === "") return def;
+  const v = raw.startsWith("#") ? raw : `#${raw}`;
+  if (!/^#[0-9a-fA-F]{6}$/.test(v)) throw new ApiError(`'${name}' must be a hex color like 22d3ee`);
+  return v;
+}
+
+async function sha256Bytes(input: string): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
+}
+
+function avatarSvg(seed: string, style: string, size: number): { svg: string; palette: string } {
+  const h = seed.toLowerCase().replace(/\s+/g, " ").trim() || "freeforagents";
+  const hue = ((h.charCodeAt(0) << 8 | h.charCodeAt(Math.min(1, h.length - 1))) % 360 + 360) % 360;
+  const bg = `hsl(${hue} 55% 92%)`;
+  const fg = `hsl(${hue} 62% 38%)`;
+  const mid = `hsl(${(hue + 40) % 360} 55% 60%)`;
+  let inner: string;
+  if (style === "initials") {
+    const words = h.split(/[\s._-]+/).filter(Boolean);
+    const initials = words.slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "F";
+    inner = `<text x="50%" y="50%" dy=".36em" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="${size * 0.42}" fill="${fg}">${initials.replace(/[<>&]/g, "")}</text>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="${bg}"/>${inner}</svg>`;
+    return { svg, palette: `${bg}|${fg}` };
+  }
+  // identicon: deterministic 5x5 mirrored grid
+  const cells: string[] = [];
+  const cellSize = size / 5;
+  for (let col = 0; col < 3; col++) {
+    for (let row = 0; row < 5; row++) {
+      const bitPos = row * 3 + col;
+      const byte = h[bitPos % h.length].charCodeAt(0) ^ h[(bitPos * 7 + 13) % h.length].charCodeAt(0) ^ (h.length + bitPos);
+      if (byte % 2 === 0) continue;
+      const color = col === 1 ? mid : fg;
+      for (const c of [col, 4 - col]) {
+        cells.push(`<rect x="${Math.round(c * cellSize)}" y="${Math.round(row * cellSize)}" width="${Math.ceil(cellSize)}" height="${Math.ceil(cellSize)}" fill="${color}"/>`);
+      }
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="${bg}"/>${cells.join("")}</svg>`;
+  return { svg, palette: `${bg}|${fg}|${mid}` };
+}
+
+export const DNS_TYPES: Record<string, number> = { A: 1, NS: 2, CNAME: 5, SOA: 6, TXT: 16, MX: 15, AAAA: 28, SRV: 33, CAA: 257 };
+const DNS_TYPE_NAMES: Record<number, string> = Object.fromEntries(Object.entries(DNS_TYPES).map(([k, v]) => [v, k]));
+
+function validHostname(name: string): boolean {
+  if (name.length > 253) return false;
+  return /^(?!-)[a-zA-Z0-9_-]{1,63}(?<!-)(\.(?!-)[a-zA-Z0-9_-]{1,63}(?<!-))*\.?$/.test(name);
+}
+
+interface DnsAnswer { name: string; type: number; TTL: number; data: string }
 
 export function findEndpoint(pathname: string): EndpointDef | undefined {
   const normalized = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;

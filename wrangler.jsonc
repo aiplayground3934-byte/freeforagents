@@ -10,6 +10,16 @@
     { "pattern": "freeforagents.dev", "custom_domain": true },
     { "pattern": "www.freeforagents.dev", "custom_domain": true }
   ],
+  // Hourly public-stats rollup (GET /stats, /stats.json).
+  // One-time setup: run ./scripts/setup-stats.sh to create the KV namespace,
+  // then uncomment the block below and paste its id. Until then the app
+  // degrades gracefully (stats pages show "sync pending").
+  // "kv_namespaces": [
+  //   { "binding": "STATS_STORE", "id": "<paste-kv-namespace-id>" }
+  // ],
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
   "analytics_engine_datasets": [
     { "binding": "STATS", "dataset": "freeforagents_stats" }
   ]

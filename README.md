@@ -34,14 +34,18 @@ Agents and scripts constantly need tiny utilities — a UUID, a hash, an FX rate
 | `GET /joke` `/fact` `/quote` | Curated content |
 | `GET /holidays?country=&year=` | Public holidays (US/GB/CA/AU/NZ/IN) |
 | `GET /fx?base=` | Daily FX rates (edge-cached) |
+| `GET /dns?name=&type=` | DNS records via Cloudflare DoH (A, AAAA, MX, TXT, …) |
+| `GET /qr?text=` | QR codes as SVG (versions 1–40, EC L/M/Q/H, custom colors) |
+| `GET /avatar?seed=&style=` | Deterministic SVG avatars (identicon / initials) |
 | `GET /headers` | Echo request headers |
 | `GET /json?url=` | Minimal https-only JSON proxy |
 
 Every response includes a `"docs"` URL hint pointing at its markdown documentation.
+Image endpoints also accept `format=svg` to return raw `image/svg+xml` for direct `<img>` use.
 
 ## MCP server
 
-The entire suite is also exposed as an MCP (Model Context Protocol) server at **`https://freeforagents.dev/mcp`** — 20 tools over Streamable HTTP, stateless, no auth. Add it to Claude Desktop / Cursor / any MCP client:
+The entire suite is also exposed as an MCP (Model Context Protocol) server at **`https://freeforagents.dev/mcp`** — 23 tools over Streamable HTTP, stateless, no auth. Add it to Claude Desktop / Cursor / any MCP client:
 
 ```json
 {
@@ -81,6 +85,19 @@ npm run dev        # http://localhost:8787
 npm run typecheck
 npm run deploy     # requires wrangler login
 ```
+
+### QR test battery
+
+Round-trip verification: every generated QR is rasterized from its SVG and decoded with jsQR.
+
+```bash
+npm run dev &      # or any running instance
+BASE_URL=http://localhost:8787 node scripts/test-qr.mjs
+```
+
+## Public stats
+
+Live usage counters at [/stats](https://freeforagents.dev/stats) (machine-readable `/stats.json`), aggregated hourly from edge analytics into KV by a cron trigger. One-time setup: `./scripts/setup-stats.sh` (creates the KV namespace + documents the `AE_TOKEN` secret). Until configured, the pages show a friendly "sync pending" state.
 
 ## License
 
